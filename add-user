@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+
+import argparse
+import csv
+import gitlab
+
+
+def add_user(api, csvfile):
+    with open(csvfile, 'r') as cf:
+        csvreader = csv.reader(cf, delimiter=',', quotechar='|')
+        for row in csvreader:
+            params = {}
+            params['email'] = row[0]
+            params['username'] = row[1]
+            params['name'] = row[2]
+            params['reset_password'] = True
+            user = api.users.create(params)
+            print('User:{} has created'.format(user))
+
+
+def add_user_to_group(api, csvfile):
+    all_group = api.groups.list()
+    with open(csvfile, 'r') as cf:
+        csvreader = csv.reader(cf, delimiter=',', quotechar='|')
+        for row in csvreader:
+            user = api.users.list(username=row[0])[0]
+            for i in range(1, len(row)):
+                group = [g for g in all_group if g.full_path == row[i]][0]
+                params = {}
+                params['user_id'] = user.id
+                params['access_level'] = gitlab.DEVELOPER_ACCESS
+                group.members.create(params)
+                print('User:{0} has joined in {1}'.format(user.name, group.name))
+
+
+if __name__ == "__main__":
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--csvfile')
+    parser.add_argument('--group', action='store_true')
+    args=parser.parse_args()
+
+    api=gitlab.Gitlab.from_config(config_files=['./python-gitlab.cfg'])
+    # if use this in proxy environment, set session.proxy.
+    # gl.session.proxies = {
+    #     'http': 'http://yourproxy.com:9090',
+    #     'https': 'https://yourproxy.com:8443'
+    # }
+
+    if args.group:
+        add_user_to_group(api=api, csvfile=args.csvfile)
+    else:
+        add_user(api=api, csvfile=args.csvfile)
